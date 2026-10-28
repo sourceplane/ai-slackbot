@@ -1,0 +1,30 @@
+# The epic's declaration. metadata.name equals the directory name; metadata.key
+# is the task-key prefix this epic reserves (SB → SB-1, SB-2, …). Owner, target
+# date and health are the platform's — never written here.
+apiVersion: orun.io/v1
+kind: Epic
+metadata:
+  name: ai-slackbot
+  key: SB
+spec:
+  title: "Vercel's AI SDK Slackbot on Cloudflare Workers"
+  summary: "Vercel's AI SDK Slackbot — an AI chatbot for Slack that answers app mentions and direct messages with an LLM and tools, every tool call gated by an Open Policy Agent policy compiled to WebAssembly — runs as one plain Cloudflare Worker: Slack's Events API at /api/events, verified with WebCrypto, acknowledged at once and answered in waitUntil, with Workers AI as its keyless model; inside the Cirrus baseline's repository conventions, it becomes an Orun baseline that takes a new Slack bot from nothing to live on stage and prod in one landing."
+  state: started
+  milestones:
+    - name: "SB0 — the spec"
+      exitCriteria:
+        - "the repository is born with its intent, CI, tooling and spec index, and this doc set and the task contracts are on main"
+      tasks: [SB-1]
+    - name: "SB1 — the Slack bot on Workers"
+      exitCriteria:
+        - "apps/api is upstream's bot as a Hono Worker: api/events.ts a route at the same path, its agent, tools and OPA policy unchanged in behaviour, Workers AI its default model"
+        - "every request is verified first with WebCrypto, acknowledged at once and answered in waitUntil; retries are not answered twice; before Slack is connected the door says so"
+        - "`pnpm typecheck`, `pnpm lint`, `pnpm test` and `pnpm build` are green, the tests driving Slack's events, the signature check and every policy rule in-process"
+        - "the README says how to connect Slack, run, test and deploy it, and how every Vercel piece maps to Cloudflare"
+      tasks: [SB-2]
+    - name: "SB2 — a baseline"
+      exitCriteria:
+        - "blueprint.yaml (the console card) and repo-blueprint.yaml (the build) take a new Slack bot from nothing to live on stage and prod in one landing, then record it"
+        - "a bot built from it carries the bot only, renamed throughout to its own name, repository and Worker, with the template's licence and policy intact"
+        - "Baseline CI is green: contract tests, generated component docs, the blueprint read by the pinned orun, the leak gate, the offline bootstrap and the end-to-end tier — the stage lane's steps in a staged job tree, the Worker smoke-tested as born and connected and Slack's events driven against stand-ins"
+      tasks: [SB-3]

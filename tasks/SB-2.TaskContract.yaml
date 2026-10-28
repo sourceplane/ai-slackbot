@@ -1,0 +1,17 @@
+apiVersion: orun.io/v1
+kind: TaskContract
+metadata:
+  name: SB-2
+  title: "The Slack bot on Workers"
+spec:
+  goal: Vercel's AI SDK Slackbot runs as one Cloudflare Worker — Slack's events at /api/events, verified, acknowledged and answered in waitUntil with Workers AI and the policy-gated tools — with its tests, and its README saying how it maps to Vercel
+  affects:
+    - apps/api
+    - tests/api
+    - pnpm-lock.yaml
+    - pnpm-workspace.yaml
+    - README.md
+  doneWhen:
+    - pnpm typecheck, lint, test and build are green
+    - wrangler dev answers Slack's signed events — a mention answered in its thread through the policy, a refusal relayed, a DM from its thread — and refuses unsigned, forged and stale ones; /health names the bot, the environment and what it is connected to
+  gates: []
