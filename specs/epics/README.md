@@ -7,5 +7,6 @@ folder is the adoption; the merge creates the epic in the workspace.
 
 | Epic | Cluster | Status | What it is |
 |------|---------|--------|------------|
+| [`ai-slackbot/`](./ai-slackbot/) | **SB** | In progress (SB0) | Vercel's AI SDK Slackbot — an AI chatbot for Slack whose every tool call an Open Policy Agent policy gates — as one Cloudflare Worker answering Slack's Events API with Workers AI, and an Orun baseline that instantiates it in one landing (SB2) |
 
 As-built ≠ intent: what shipped lives in each epic's `IMPLEMENTATION-STATUS.md`.
