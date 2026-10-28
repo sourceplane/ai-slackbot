@@ -1,0 +1,100 @@
+apiVersion: sourceplane.io/v1
+kind: Component
+metadata:
+  name: api
+  description: The AI SDK Slackbot — Slack's Events API at /api/events on a plain Cloudflare Worker, answering with Workers AI and policy-gated tools (per environment)
+spec:
+  type: cloudflare-worker-turbo
+  lifecycle: production
+  owner: platform
+  # Its pages, attached to it in the workspace's catalog: what the Docs
+  # library shows for it, and what the catalog's docs and runbook checks read.
+  # Generated from what this manifest and its sources declare.
+  docs:
+    overview: docs/overview.md
+    pages:
+      - { path: docs/architecture.md, role: architecture, title: Architecture }
+      - { path: docs/runbook.md, role: runbook, title: Runbook }
+  # `app`, not `api`: a domain and a component share one name space in the
+  # catalog, and a domain called `api` would take this component's place in
+  # it — the API missing from its own catalog.
+  domain: app
+  path: apps/api
+  # No dependsOn: the bot reads no wiring and binds nothing Terraform makes —
+  # its one binding, Workers AI (wrangler.jsonc), is the account's own.
+  #
+  # The bot's keys, stored per environment as the product's secrets of the
+  # same names (README → Connect Slack). The Worker reads them at request time
+  # (src/env.ts), so no build ever sees one: the composition's secrets-live
+  # step hands those that are set to the Worker as Worker SECRETS after the
+  # deploy (runtimeSecrets below). BEST-EFFORT references,
+  # wire-now-seed-later: a key nobody has stored is skipped when the job
+  # resolves its secrets (no env var, no failure), so a fresh product deploys,
+  # answers /health and says on /api/events that Slack is not connected,
+  # before its owner has created a Slack app at all.
+  optionalSecretEnv:
+    SLACK_SIGNING_SECRET: "secret://ai-slackbot/ai-slackbot/{{ .environment }}/SLACK_SIGNING_SECRET"
+    SLACK_BOT_TOKEN: "secret://ai-slackbot/ai-slackbot/{{ .environment }}/SLACK_BOT_TOKEN"
+    OPENAI_API_KEY: "secret://ai-slackbot/ai-slackbot/{{ .environment }}/OPENAI_API_KEY"
+    OPENAI_MODEL: "secret://ai-slackbot/ai-slackbot/{{ .environment }}/OPENAI_MODEL"
+    EXA_API_KEY: "secret://ai-slackbot/ai-slackbot/{{ .environment }}/EXA_API_KEY"
+  subscribe:
+    environments:
+      - name: dev
+        profile: verify
+      - name: stage
+        profile: verify
+        profileRules:
+          - profile: deploy
+            when:
+              triggerRef: github-push-main
+      - name: prod
+        profile: verify
+        profileRules:
+          - profile: deploy
+            when:
+              triggerRef: github-push-main
+  parameters:
+    nodeVersion: "22"
+    pnpmVersion: "10.12.1"
+
+    workspaceDir: ../..
+    appDir: .
+
+    turboFilter: "@app/api"
+    # Committed, not rendered: the Worker's one binding (Workers AI) has no
+    # resource ID to wire, and the lanes' structure check (`test -f`, before
+    # any build) finds it in a fresh checkout. Per-env names come from `--env`:
+    # ai-slackbot-api-{stage,prod}.
+    wranglerConfig: wrangler.jsonc
+
+    installCommand: pnpm install --frozen-lockfile
+    buildCommand: pnpm exec turbo run build --filter=@app/api
+    typecheckCommand: pnpm exec turbo run typecheck --filter=@app/api
+
+    dryRunCommand: pnpm exec wrangler deploy --dry-run --config wrangler.jsonc --env prod
+    deployCommand: pnpm exec wrangler deploy --config wrangler.jsonc --env prod
+
+    # The keys secrets-live pushes as Worker secrets after each deploy — the
+    # ones the environment has stored, named only in the log, never a value.
+    runtimeSecrets: SLACK_SIGNING_SECRET,SLACK_BOT_TOKEN,OPENAI_API_KEY,OPENAI_MODEL,EXA_API_KEY
+
+    preDeployCommand: "echo 'No pre-deploy step configured.'"
+    migrationCommand: "echo 'No migrations configured.'"
+    # Smoke: /health answers `"status":"ok"` for THIS environment — the
+    # environment comes from the `env.<name>` vars the deploy used, so a stale
+    # or wrong Worker fails it — and then Slack's door: POST /api/events with
+    # no signature must be REFUSED, a 400 once Slack is connected or a 503
+    # before (never a 500, never a 200 — a door that answers an unsigned event
+    # would answer a forged one). Not the bot's name, which is the owner's to
+    # change. The Worker composition exports no deployed URL, so the command
+    # names its own workers.dev URL; ${DEPLOYED_URL} overrides it (a custom
+    # domain, or a local `wrangler dev`). ${ORUN_ENVIRONMENT} the runner sets
+    # for every step. Each body is buffered before grep so an early match
+    # cannot SIGPIPE curl.
+    smokeCommand: 'base="${DEPLOYED_URL:-https://ai-slackbot-api-${ORUN_ENVIRONMENT}.your-workers-subdomain.workers.dev}" && health="$(curl -sf --max-time 20 "${base}/health")" && echo "${health}" | grep -q "\"status\":\"ok\"" && echo "${health}" | grep -q "\"environment\":\"${ORUN_ENVIRONMENT}\"" && code="$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 -X POST "${base}/api/events" -H "content-type: application/json" -d "{\"type\":\"url_verification\",\"challenge\":\"orun-smoke\"}")" && case "${code}" in 400|503) ;; *) echo "POST /api/events without a signature answered ${code}, not 400 or 503" >&2; false ;; esac'
+  labels:
+    team: platform
+    layer: runtime
+    surface: api
+    runtime: cloudflare

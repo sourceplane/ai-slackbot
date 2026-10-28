@@ -10,7 +10,7 @@ baseline that makes a copy of it somebody else's bot in one landing.**
 
 | | |
 |---|---|
-| Status | In progress — SB0 on main |
+| Status | In progress — SB1 on main: the site runs on Workers |
 | Upstream | [vercel-labs/ai-sdk-slackbot](https://github.com/vercel-labs/ai-sdk-slackbot) (MIT, as its README declares; no LICENSE file), at `7d84809` |
 | Reference | [hono-api](https://github.com/sourceplane/hono-api) and hono-mcp — the same plain Worker, scaffolding, tests and bootstrap |
 | Key | `SB` |
