@@ -9,7 +9,7 @@ metadata:
 spec:
   title: "Vercel's AI SDK Slackbot on Cloudflare Workers"
   summary: "Vercel's AI SDK Slackbot — an AI chatbot for Slack that answers app mentions and direct messages with an LLM and tools, every tool call gated by an Open Policy Agent policy compiled to WebAssembly — runs as one plain Cloudflare Worker: Slack's Events API at /api/events, verified with WebCrypto, acknowledged at once and answered in waitUntil, with Workers AI as its keyless model; inside the Cirrus baseline's repository conventions, it becomes an Orun baseline that takes a new Slack bot from nothing to live on stage and prod in one landing."
-  state: started
+  state: completed
   milestones:
     - name: "SB0 — the spec"
       exitCriteria:
