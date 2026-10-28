@@ -4,9 +4,9 @@ Vercel's [AI SDK Slackbot](https://github.com/vercel-labs/ai-sdk-slackbot)
 template — an AI chatbot for Slack that answers app mentions and direct
 messages with an LLM and tools (weather, dice, a sandboxed bash, web search),
 every tool call gated by an Open Policy Agent policy compiled to WebAssembly —
-running natively as a **Cloudflare Worker**, deployed by
-[Orun](https://github.com/sourceplane/orun) to stage and prod on every merge.
-Packaging it as an Orun baseline is the next milestone (SB2).
+running natively as a **Cloudflare Worker**, and packaged as an **Orun
+baseline**: one command takes a new Slack bot from nothing to live on stage
+and prod, in its own repository, under its own name — in ONE landing.
 
 Upstream's `api/events.ts` (a Vercel function) is a [Hono](https://hono.dev)
 route here, at the same path: Hono's `fetch` handler is the Worker's, no
@@ -16,9 +16,47 @@ through the Worker's own `AI` binding, so a fresh bot needs no AI key;
 upstream's OpenAI is used, directly, once its key is stored. The policy, the
 agent loop and the tools are upstream's. The bot is born **not connected**: it
 deploys and `/api/events` says so until its owner creates a Slack app and
-stores its two keys. See
+stores its two keys. What the baseline adds is everything needed to make a
+copy of it somebody else's — built the way
+[cirrus-baseline](https://github.com/sourceplane/cirrus-baseline) is. See
 [`specs/epics/ai-slackbot`](specs/epics/ai-slackbot/README.md) for the
 design, the milestones and the as-built status.
+
+## Instantiating a product
+
+```bash
+git clone --depth 1 --branch <baseline-tag> https://github.com/sourceplane/ai-slackbot
+cd ai-slackbot
+orun new --blueprint repo-blueprint.yaml --out ~/bots/acme-assistant --run-hooks --resume \
+  --set reponame=acme-assistant --set productname="Acme Assistant" \
+  --set githuborg=acme-inc --set subdomain=<workers-dev-subdomain>
+```
+
+Or, once the platform's registry lists it, from the Orun console (Baselines →
+`ai-slackbot` → Build). Two phases — `01-product` (the repository, its CI and
+the whole bot in one pull request, deployed to stage and prod by one
+convergence, smoke-tested) and `02-docs` (the live deployment recorded) —
+each landing one pull request in the new repository.
+**[BOOTSTRAP.md](BOOTSTRAP.md)** is the operator guide;
+[docs/phases/](docs/phases/README.md) has a page per phase.
+
+The new repository receives the **bot only** — the Worker, its policy, its
+tests, its CI, its tooling, a README of its own, its operating contract and
+the template's licence — renamed throughout to the bot's name, repository and
+Cloudflare Worker. None of this
+repository's machinery ships, and nothing that ships names it.
+
+| What makes it a baseline | Where |
+|---|---|
+| The console card (inputs, secrets, programme) | `blueprint.yaml` |
+| The build document (modules, phases, hooks) | `repo-blueprint.yaml` |
+| This tree's identity, and the bootstrap's task contracts | `.baseline/` |
+| The rename engine | `tooling/rebrand/rebrand.mjs` |
+| The bootstrap's helpers (deferrals, redeploy marker, work-tree strip) | `tooling/bootstrap/` |
+| The deployment-record renderer | `hooks/render-deployment-docs.sh` |
+| The bot's README and context pack | `.baseline/product/README.md`, `ai/context/` |
+| The baseline's tests: contract, leak, offline bootstrap, end to end | `testing/`, `.github/workflows/baseline.yml` |
+| Cutting a `baseline-vN` tag | `.github/workflows/tag.yml` |
 
 ## What is here (the product)
 
@@ -54,9 +92,8 @@ pnpm --filter @app/api dev        # http://localhost:8787
 curl http://localhost:8787/health # {"status":"ok","name":"AI SDK Slackbot","environment":"local","slack":…}
 ```
 
-Connecting Slack: create a Slack app, put its signing secret and bot token in
-`apps/api/.dev.vars` for local work (or store them as the environment's Orun
-secrets and redeploy), and set its Request URL to the Worker's `/api/events`.
+The product README (`.baseline/product/README.md`) says how to create the
+Slack app and connect it.
 
 ## How it maps to Vercel
 
@@ -77,12 +114,15 @@ secrets and redeploy), and set its Request URL to the Worker's `/api/events`.
 | Env vars in the Vercel project | Orun secrets per environment, pushed to the Worker as Worker secrets after each deploy (`runtimeSecrets`) |
 | `vc dev` · `vc deploy` | `wrangler dev` · `wrangler deploy --env <stage\|prod>` |
 | Deploy on push | Orun deploys `<repo>-api-{stage,prod}` on merge to `main` and smoke-tests `/health` and the signed events door (`apps/api/component.yaml`) |
+| "Deploy with Vercel" (clone the template) | `orun new --blueprint repo-blueprint.yaml` — a new repository, branded, deployed |
 
 ## CI
 
 | Workflow | What it runs | Ships to a bot |
 |---|---|---|
 | `ci.yml` | the Orun pipeline, and the only workflow a bot carries: `orun plan --changed`, then one job per lane. A pull request runs the verify lanes (the Worker built, type-checked and dry-deployed per environment; the tests' `quick-check` lane installs and checks the package, it does not run them), except the bootstrap's own landings (`orun/BASE-*`), where `plan` alone is the check; a merge deploys stage → prod. It plans nothing while `intent.yaml` names the placeholder workspace `ws_CHANGE_ME`, as this repository does. A manual run (Orunbase's Deploy button, or Run workflow on `main`) plans the environment and components it names under the push-to-main trigger, so they deploy as a merge deploys them | yes |
+| `baseline.yml` | the baseline's own tiers: contract tests, the blueprint read by the pinned orun, the leak gate, the offline bootstrap, the bot built, dry-deployed, served as born and connected, and Slack's events driven through stand-ins for Slack and Workers AI | no |
+| `tag.yml` | cuts a `baseline-vN` tag (manual) | no |
 
 ## Credits
 

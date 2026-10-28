@@ -1,0 +1,163 @@
+# The ai-slackbot card: what the console's Blueprints page renders and the
+# platform's bootstrap door consumes.
+#
+# THIS FILE IS NOT THE BUILD. `spec.bootstrap.blueprint` names the build
+# document — `repo-blueprint.yaml`, whose phases a runner places. This card is
+# what an operator reads and fills in before pressing Build, and
+# `testing/manifest.test.sh` compares every list below to the document that
+# actually does the thing, not to a copy of itself.
+#
+# The division of labour with the registry is strict: the registry (orun-cloud
+# `infra/baselines-registry/baselines.yaml`) owns identity and commerce — id,
+# visibility, tier, the pinned tag. This file owns the build contract. Neither
+# restates the other, which is why there is no `tag` here: this file is
+# fetched AT the tag the registry pins.
+apiVersion: orun.io/v1
+kind: Blueprint
+metadata:
+  name: ai-slackbot
+  displayName: AI SDK Slackbot — an AI chatbot for Slack on one Cloudflare Worker
+  description: >
+    Vercel's AI SDK Slackbot as a product of its own: a Slack bot that answers
+    app mentions and direct messages with an LLM and tools (weather, dice, a
+    sandboxed bash, and web search once Exa's key is stored), every tool call
+    gated by an Open Policy Agent policy compiled to WebAssembly, on Slack's
+    Events API at /api/events — one Hono app on a plain Cloudflare Worker that
+    verifies Slack's signature, acknowledges at once and answers in the
+    background, with Workers AI as its model, so it needs no AI key. Vitest
+    tests drive Slack's events in-process, and CI deploys it to stage and
+    prod on merge, smoke-tested. It goes live before a Slack app exists and
+    answers once its owner stores the app's two keys. One provider, one
+    consent, one landing. Live in about six minutes.
+  tags: [slack, bot, ai, workers-ai, hono, cloudflare]
+spec:
+  source:
+    repo: sourceplane/ai-slackbot
+    # No `tag`. The registry pins it; this file is fetched at it.
+
+  # ── What the operator reads first ────────────────────────────────────────
+  overview:
+    lede: >
+      An AI chatbot for Slack on Cloudflare alone. It deploys before a Slack
+      app exists and says so on /api/events; create the app, store its
+      signing secret and bot token, and it answers mentions and DMs with
+      Workers AI and policy-gated tools.
+    architecture:
+      - layer: Edge
+        items: [api]
+      - layer: Routes
+        items: [POST /api/events, GET /, GET /health]
+      - layer: Model and tools
+        items: [Workers AI, OPA policy, just-bash sandbox]
+      - layer: Connected after the build
+        items: [Slack app, OpenAI (optional), Exa (optional)]
+      - layer: Delivery
+        items: [GitHub Actions, wrangler]
+    outcome:
+      - Live on stage and prod, in one landing
+      - Says Slack is not connected until its owner stores the app keys — never a 500
+      - Every merge redeploys, smoke-tested on /health and the signed events door
+      - Its own CI from the first commit
+
+  requires:
+    # Cloudflare is the only provider connection a bootstrap needs. GitHub
+    # arrives as the App installation plus the repo link, not as a
+    # connection row. Slack is NOT a provider the platform brokers: the bot
+    # is built without it, and its owner creates the Slack app and stores its
+    # two keys afterwards (the product's README, "Connect Slack").
+    integrations: [github, cloudflare]
+    apiKeyRole: admin          # secret writes need the admin floor
+
+  # Every input is collected by the console: keys are lowercase (the
+  # platform's reader refuses anything else), every one carries the `pattern`
+  # its value is checked against before Continue, and a value the console
+  # already holds says so with `from`. repo-blueprint.yaml declares the same
+  # names; `repoPrivate`, `orunWorkspace` and `epicSlug` are build inputs with
+  # defaults (or filled from the build's workspace) and are not asked.
+  #
+  # NOR IS THE DOMAIN. The bot goes live on workers.dev, and a domain is an
+  # owner's step after the bootstrap: `productdomain` defaults to empty, the
+  # rebrand writes the reserved placeholder `<reponame>.example.com` where
+  # the domain goes, and the bot's README ("Custom domain") says how to set
+  # it. Nothing that needs a domain is removed — it waits for one.
+  inputs:
+    - key: reponame
+      label: Repo name
+      pattern: "^[a-z][a-z0-9-]{1,38}$"
+      # The operator picked the repository; its name IS this value.
+      from: repo.name
+    - key: productname
+      label: Bot name
+      pattern: "^[A-Za-z0-9][A-Za-z0-9 .,'&-]{1,48}$"
+      help: The name the bot answers with — GET / and GET /health report it beside the environment.
+      example: Acme Assistant
+    - key: githuborg
+      label: GitHub organisation
+      pattern: "^[A-Za-z0-9][A-Za-z0-9-]*$"
+      help: The GitHub org or user the bot's repository is created under.
+      # DERIVED FROM THE CHOSEN REPOSITORY: its owner IS this value. Declared
+      # because repo-blueprint.yaml requires it — a build may declare more
+      # inputs than this card, but not require one nobody supplies.
+      from: repo.owner
+    - key: subdomain
+      label: workers.dev subdomain
+      pattern: "^[a-z0-9][a-z0-9-]{0,62}$"
+      help: The workers.dev subdomain of the Cloudflare account the bot deploys into.
+      example: acme
+      # READ FROM THE CLOUDFLARE CONNECTION, not asked. The subdomain belongs
+      # to the account the same way its id does, and there is exactly one
+      # right answer — a typed one could only be wrong, and wrong showed up
+      # after deploy, in the deploy's smoke check, the phase probes and the
+      # verify URLs below. The integration reads it from Cloudflare at connect
+      # and on its hourly health check; the bootstrap door fills this input
+      # from the connection the build is BOUND to, the same one
+      # CLOUDFLARE_ACCOUNT_ID and the deploy tokens mint from, so all three
+      # name one account. The console renders no field for it. An account
+      # with no workers.dev subdomain refuses the build at the door, naming
+      # the fix, before anything is created.
+      from: connection.cloudflare.workersSubdomain
+
+  # ── PREVIEW ONLY. repo-blueprint.yaml's `orun.integrations/reconcile@v1`
+  # hook mints these, brokered, during 01-product. ──────────────────────────
+  # Transcribed from that hook's own `secrets:` list (each key and its
+  # `template:`), so testing/manifest.test.sh compares this list to the
+  # document that mints them. The console renders them read-only: no
+  # credential is ever typed, shown or stored. Keys that already exist are
+  # kept.
+  secrets:
+    - key: CLOUDFLARE_API_TOKEN
+      provider: cloudflare
+      template: workers-deploy
+      why: Deploys the bot's Worker
+    - key: CLOUDFLARE_ACCOUNT_ID
+      provider: cloudflare
+      template: account-id
+      why: Connection fact, not a secret
+      fact: true
+
+  # ── PREVIEW ONLY. repo-blueprint.yaml's run-level `hooks.preInstantiate`
+  # opens these — the epic, every milestone in this order, every task — before
+  # the first phase places. Idempotent by identity, so a re-run finds what it
+  # made before.
+  programme:
+    epicSlug: ai-slackbot-baselining      # = repo-blueprint.yaml's `epicSlug` default
+    epicName: "AI SDK Slackbot baselining — {productname}"
+    milestones:
+      - name: 01-product
+      - name: 02-docs
+
+  bootstrap:
+    # THE BUILD DOCUMENT. There is no umbrella workflow and no agent brief:
+    # every phase is declared in it and orun runs it.
+    blueprint: repo-blueprint.yaml
+    # Summed from the phases' expectedMinutes (01-product 5, 02-docs 1). An
+    # estimate until a bootstrap of this shape measures it.
+    expectedMinutes: 6
+    tokenChannel: ORUN_TOKEN_FILE   # how a runner hands over its refreshed token
+  # The bot's URL per environment, as the console links it: the welcome
+  # route, which names Slack's events endpoint. The phases' own probes read
+  # /health on the same Worker.
+  verify:
+    urls:
+      - "https://{reponame}-api-{env}.{subdomain}.workers.dev"
+    envs: [stage, prod]

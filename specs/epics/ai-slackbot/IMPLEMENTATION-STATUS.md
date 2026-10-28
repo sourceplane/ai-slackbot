@@ -4,7 +4,7 @@
 |---|---|---|
 | SB0 — the spec | ✅ | SB-1 |
 | SB1 — the Slack bot on Workers | ✅ | SB-2 |
-| SB2 — a baseline | planned | SB-3 |
+| SB2 — a baseline | ✅ | SB-3, tagged `baseline-v1` |
 
 ## Departures from the upstream template
 
