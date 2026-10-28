@@ -1,0 +1,49 @@
+// Committed as-is (no wiring template): the Worker's one binding is the
+// account's Workers AI, which has no resource id to wire. Orun deploys with
+// `--env stage` / `--env prod`; wrangler names the Worker
+// ai-slackbot-api-<env> from the top-level name. Each environment's
+// ENVIRONMENT var is what GET /health reports. A binding is not inherited by
+// a named environment, so `ai` is declared in each.
+//
+// The bot's keys (Slack's two, and any model or search key) are Worker
+// SECRETS, never vars: the deploy pushes the ones the environment has stored
+// (component.yaml → runtimeSecrets), and `wrangler secret put` sets one by
+// hand.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ai-slackbot-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true
+  },
+  // just-bash's browser build, the one a Worker can run (src/vendor/just-bash.js).
+  "alias": {
+    "just-bash": "./src/vendor/just-bash.js"
+  },
+  "ai": { "binding": "AI" },
+  "vars": {
+    "ENVIRONMENT": "local"
+  },
+  "env": {
+    "dev": {
+      "ai": { "binding": "AI" },
+      "vars": {
+        "ENVIRONMENT": "dev"
+      }
+    },
+    "stage": {
+      "ai": { "binding": "AI" },
+      "vars": {
+        "ENVIRONMENT": "stage"
+      }
+    },
+    "prod": {
+      "ai": { "binding": "AI" },
+      "vars": {
+        "ENVIRONMENT": "prod"
+      }
+    }
+  }
+}
