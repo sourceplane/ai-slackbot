@@ -54,6 +54,29 @@ spec:
           - profile: deploy
             when:
               triggerRef: github-push-main
+  # How the API runs itself for orun.work's live Preview tab
+  # (saas-parallel-baselining PB4): `orun preview` starts this, and a coding
+  # session keeps it running while it works, so the person watches it change
+  # as it is built. The dev server binds the box's loopback only, on a fixed
+  # port, and installs first, so a checkout the session has not installed yet
+  # still comes up.
+  # It is a Slack bot, so the tab shows what / answers: its name, its
+  # endpoints and whether Slack is connected (not, in a preview: the Slack
+  # secrets are never in it, so /api/events answers 503). `--local` keeps
+  # remote bindings off: the AI binding is Workers AI, which has no local
+  # mode, and without it wrangler would open a remote session that needs a
+  # Cloudflare credential, and stop when it has none. So the bot cannot call
+  # its model in a preview. wrangler dev runs the Worker in workerd and
+  # reloads it on every edit.
+  preview:
+    run:
+      - sh
+      - -c
+      - pnpm install --frozen-lockfile --prefer-offline --filter "@app/api..." && exec node_modules/.bin/wrangler dev --local --ip 127.0.0.1 --port 8787 --show-interactive-dev-session=false
+    port: 8787
+    path: /
+    env:
+      WRANGLER_SEND_METRICS: "false"
   parameters:
     nodeVersion: "22"
     pnpmVersion: "10.12.1"
