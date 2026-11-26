@@ -17,7 +17,7 @@ export async function assistantThreadMessage(
   await bot.slack.chat.postMessage({
     channel: channel_id,
     thread_ts: thread_ts,
-    text: "Hello, I'm an AI assistant built with the AI SDK by Vercel!",
+    text: "Hello, I'm an AI assistant built with the AI SDK!",
   });
 
   await bot.slack.assistant.threads.setSuggestedPrompts({
